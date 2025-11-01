@@ -33,12 +33,8 @@ jobs:
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
         run: |
-          # Build Basic auth header
-          BASIC=$(python - <<'PY'
-          import os, base64
-          print(base64.b64encode(f"{os.environ['SPOTIFY_CLIENT_ID']}:{os.environ['SPOTIFY_CLIENT_SECRET']}".encode()).decode())
-          PY
-          )
+          # Build Basic auth header (safe, portable)
+          BASIC=$(printf '%s:%s' "$SPOTIFY_CLIENT_ID" "$SPOTIFY_CLIENT_SECRET" | base64)
 
           # Exchange refresh token for a short-lived access token
           RESP=$(curl -s -X POST https://accounts.spotify.com/api/token \
@@ -46,15 +42,8 @@ jobs:
             -H "Content-Type: application/x-www-form-urlencoded" \
             -d "grant_type=refresh_token&refresh_token=${SPOTIFY_REFRESH_TOKEN}")
 
-          # Output the access token for later steps (fail if Spotify didn't return one)
-          ACCESS=$(python - <<'PY'
-          import json,sys
-          try:
-              print(json.load(sys.stdin).get("access_token", ""))
-          except Exception:
-              print("")
-          PY
-          <<<"$RESP")
+          # Extract access token reliably by piping JSON into python
+          ACCESS=$(printf '%s' "$RESP" | python -c 'import sys,json; print(json.load(sys.stdin).get("access_token",""))')
 
           if [ -z "$ACCESS" ] || [ "$ACCESS" = "null" ]; then
             echo "ERROR: failed to obtain access_token from Spotify. Response below:" >&2
