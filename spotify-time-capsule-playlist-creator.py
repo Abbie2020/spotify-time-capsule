@@ -8,10 +8,38 @@ import random
 TOKEN_PATH = ".spotify_tokens.json"
 
 def get_spotify_client():
-    """Create a Spotipy client using stored credentials + refresh token."""
+    """Create a Spotipy client.
+
+    Priority order:
+    1. Use SPOTIFY_ACCESS_TOKEN env var (for GitHub Actions or other short-lived tokens).
+    2. If available, use SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET / SPOTIFY_REFRESH_TOKEN / SPOTIFY_REDIRECT_URI
+       from environment to refresh an access token.
+    3. Fall back to the local `.spotify_tokens.json` refresh flow (original behaviour).
+    """
+
+    # 1) Direct access token provided (e.g. via GitHub Actions secrets)
+    access_token = os.getenv("SPOTIFY_ACCESS_TOKEN")
+    if access_token:
+        return spotipy.Spotify(auth=access_token)
+
+    # 2) Credentials & refresh token provided via environment variables
+    client_id = os.getenv("SPOTIFY_CLIENT_ID")
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
+    refresh_token = os.getenv("SPOTIFY_REFRESH_TOKEN")
+
+    if client_id and client_secret and refresh_token and redirect_uri:
+        sp_oauth = SpotifyOAuth(
+            client_id=client_id,
+            client_secret=client_secret,
+            scope="playlist-modify-public playlist-modify-private",
+        )
+        token_info = sp_oauth.refresh_access_token(refresh_token)
+        return spotipy.Spotify(auth=token_info["access_token"])
+
+    # 3) Fallback to stored tokens file (existing local-dev flow)
     if not os.path.exists(TOKEN_PATH):
         raise FileNotFoundError(
-            "No .spotify_tokens.json file found. Run spotify_auth.py first to authorise."
+            "No .spotify_tokens.json file found. Run spotify_auth.py first to authorise or set environment variables."
         )
 
     with open(TOKEN_PATH, "r") as f:
