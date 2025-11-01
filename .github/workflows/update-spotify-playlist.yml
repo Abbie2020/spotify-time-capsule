@@ -1,0 +1,63 @@
+name: Update Spotify Playlist
+
+on:
+  schedule:
+    # 08:00 UK local time year-round (handles GMT/BST by using two UTC hours)
+    - cron: '0 8 * * *'    # 08:00 UTC (winter = 08:00 UK)
+    - cron: '0 7 * * *'    # 07:00 UTC (summer = 08:00 UK)
+  workflow_dispatch:        # allow manual runs from the UI
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Get Spotify access token
+        id: token
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+        run: |
+          # Build Basic auth header
+          BASIC=$(python - <<'PY'
+          import os, base64
+          print(base64.b64encode(f"{os.environ['SPOTIFY_CLIENT_ID']}:{os.environ['SPOTIFY_CLIENT_SECRET']}".encode()).decode())
+          PY
+          )
+
+          # Exchange refresh token for a short-lived access token
+          RESP=$(curl -s -X POST https://accounts.spotify.com/api/token \
+            -H "Authorization: Basic $BASIC" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=refresh_token&refresh_token=${SPOTIFY_REFRESH_TOKEN}")
+
+          # Output the access token for later steps
+          ACCESS=$(python - <<'PY'
+          import json,sys
+          print(json.load(sys.stdin)["access_token"])
+          PY
+          <<<"$RESP")
+          echo "access_token=$ACCESS" >> "$GITHUB_OUTPUT"
+
+      - name: Run playlist updater
+        env:
+          # Action-provided short-lived access token (preferred)
+          SPOTIFY_ACCESS_TOKEN: ${{ steps.token.outputs.access_token }}
+        run: |
+          # Run your playlist creator script. It will prefer SPOTIFY_ACCESS_TOKEN if present.
+          python spotify-time-capsule-playlist-creator.py
