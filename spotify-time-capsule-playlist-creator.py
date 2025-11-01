@@ -27,7 +27,7 @@ def get_spotify_client():
     client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
     refresh_token = os.getenv("SPOTIFY_REFRESH_TOKEN")
 
-    if client_id and client_secret and refresh_token and redirect_uri:
+    if client_id and client_secret and refresh_token:
         sp_oauth = SpotifyOAuth(
             client_id=client_id,
             client_secret=client_secret,
