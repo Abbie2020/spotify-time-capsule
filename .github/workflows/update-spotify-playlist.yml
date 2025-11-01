@@ -46,12 +46,22 @@ jobs:
             -H "Content-Type: application/x-www-form-urlencoded" \
             -d "grant_type=refresh_token&refresh_token=${SPOTIFY_REFRESH_TOKEN}")
 
-          # Output the access token for later steps
+          # Output the access token for later steps (fail if Spotify didn't return one)
           ACCESS=$(python - <<'PY'
           import json,sys
-          print(json.load(sys.stdin)["access_token"])
+          try:
+              print(json.load(sys.stdin).get("access_token", ""))
+          except Exception:
+              print("")
           PY
           <<<"$RESP")
+
+          if [ -z "$ACCESS" ] || [ "$ACCESS" = "null" ]; then
+            echo "ERROR: failed to obtain access_token from Spotify. Response below:" >&2
+            echo "$RESP" >&2
+            exit 1
+          fi
+
           echo "access_token=$ACCESS" >> "$GITHUB_OUTPUT"
 
       - name: Run playlist updater
@@ -59,5 +69,11 @@ jobs:
           # Action-provided short-lived access token (preferred)
           SPOTIFY_ACCESS_TOKEN: ${{ steps.token.outputs.access_token }}
         run: |
+          # Fail fast if no access token was obtained
+          if [ -z "$SPOTIFY_ACCESS_TOKEN" ]; then
+            echo "ERROR: SPOTIFY_ACCESS_TOKEN is empty — aborting" >&2
+            exit 1
+          fi
+
           # Run your playlist creator script. It will prefer SPOTIFY_ACCESS_TOKEN if present.
           python spotify-time-capsule-playlist-creator.py

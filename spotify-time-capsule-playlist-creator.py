@@ -20,21 +20,34 @@ def get_spotify_client():
     # 1) Direct access token provided (e.g. via GitHub Actions secrets)
     access_token = os.getenv("SPOTIFY_ACCESS_TOKEN")
     if access_token:
+        # don't print the token itself — just a marker so CI logs show which branch ran
+        print("DEBUG: using SPOTIFY_ACCESS_TOKEN from environment")
         return spotipy.Spotify(auth=access_token)
 
     # 2) Credentials & refresh token provided via environment variables
     client_id = os.getenv("SPOTIFY_CLIENT_ID")
     client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
     refresh_token = os.getenv("SPOTIFY_REFRESH_TOKEN")
+    # redirect URI is not required to refresh an access token, but we read it if provided
+    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI")
 
     if client_id and client_secret and refresh_token:
-        sp_oauth = SpotifyOAuth(
-            client_id=client_id,
-            client_secret=client_secret,
-            scope="playlist-modify-public playlist-modify-private",
-        )
-        token_info = sp_oauth.refresh_access_token(refresh_token)
-        return spotipy.Spotify(auth=token_info["access_token"])
+        print("DEBUG: attempting refresh using SPOTIFY_CLIENT_ID/SECRET + SPOTIFY_REFRESH_TOKEN from env")
+        try:
+            sp_oauth = SpotifyOAuth(
+                client_id=client_id,
+                client_secret=client_secret,
+                redirect_uri=redirect_uri,
+                scope="playlist-modify-public playlist-modify-private",
+            )
+            token_info = sp_oauth.refresh_access_token(refresh_token)
+            access = token_info.get("access_token")
+            if not access:
+                raise RuntimeError(f"refresh_access_token returned no access_token: {token_info}")
+            return spotipy.Spotify(auth=access)
+        except Exception as e:
+            # Log the error (no secrets) and fall through to the file-based fallback so CI shows meaningful info
+            print("ERROR: failed to refresh access token from environment variables:", str(e))
 
     # 3) Fallback to stored tokens file (existing local-dev flow)
     if not os.path.exists(TOKEN_PATH):
