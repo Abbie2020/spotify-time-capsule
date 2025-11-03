@@ -56,21 +56,21 @@ jobs:
           # Parse response with proper error handling
           echo "Parsing response..."
           ACCESS=$(echo "$RESP" | python3 -c '
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    token = data.get("access_token")
-    if not token:
-        print("No access_token in response:", file=sys.stderr)
-        json.dump(data, sys.stderr, indent=2)
-        sys.exit(1)
-    print(token)
-except Exception as e:
-    print(f"Failed to parse response: {e}", file=sys.stderr)
-    print(f"Raw response: {sys.stdin.read()}", file=sys.stderr)
-    sys.exit(1)
-          ')
-          
+          import sys, json
+          try:
+              data = json.load(sys.stdin)
+              token = data.get("access_token")
+              if not token:
+                  print("No access_token in response:", file=sys.stderr)
+                  json.dump(data, sys.stderr, indent=2)
+                  sys.exit(1)
+              print(token)
+          except Exception as e:
+              print(f"Failed to parse response: {e}", file=sys.stderr)
+              print(f"Raw response: {sys.stdin.read()}", file=sys.stderr)
+              sys.exit(1)
+                    ')
+                    
           # Set output with success message
           echo "access_token=$ACCESS" >> "$GITHUB_OUTPUT"
           echo "Successfully obtained access token"
