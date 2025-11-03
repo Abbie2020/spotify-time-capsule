@@ -33,25 +33,47 @@ jobs:
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
         run: |
-          # Build Basic auth header (safe, portable)
-          BASIC=$(printf '%s:%s' "$SPOTIFY_CLIENT_ID" "$SPOTIFY_CLIENT_SECRET" | base64)
-
-          # Exchange refresh token for a short-lived access token
-          RESP=$(curl -s -X POST https://accounts.spotify.com/api/token \
+          set -e  # Exit immediately if any command fails
+          
+          # Debug presence of secrets (values not printed)
+          echo "Checking secrets..."
+          [ -n "$SPOTIFY_CLIENT_ID" ] || { echo "Error: SPOTIFY_CLIENT_ID is empty" >&2; exit 1; }
+          [ -n "$SPOTIFY_CLIENT_SECRET" ] || { echo "Error: SPOTIFY_CLIENT_SECRET is empty" >&2; exit 1; }
+          [ -n "$SPOTIFY_REFRESH_TOKEN" ] || { echo "Error: SPOTIFY_REFRESH_TOKEN is empty" >&2; exit 1; }
+          
+          # Build Basic auth header with explicit base64 wrap
+          echo "Building auth header..."
+          BASIC=$(echo -n "$SPOTIFY_CLIENT_ID:$SPOTIFY_CLIENT_SECRET" | base64 -w 0)
+          
+          # Exchange refresh token for access token
+          echo "Exchanging refresh token..."
+          RESP=$(curl -sS -X POST "https://accounts.spotify.com/api/token" \
             -H "Authorization: Basic $BASIC" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "grant_type=refresh_token&refresh_token=${SPOTIFY_REFRESH_TOKEN}")
-
-          # Extract access token reliably by piping JSON into python
-          ACCESS=$(printf '%s' "$RESP" | python -c 'import sys,json; print(json.load(sys.stdin).get("access_token",""))')
-
-          if [ -z "$ACCESS" ] || [ "$ACCESS" = "null" ]; then
-            echo "ERROR: failed to obtain access_token from Spotify. Response below:" >&2
-            echo "$RESP" >&2
-            exit 1
-          fi
-
+            -d "grant_type=refresh_token" \
+            -d "refresh_token=$SPOTIFY_REFRESH_TOKEN")
+          
+          # Parse response with proper error handling
+          echo "Parsing response..."
+          ACCESS=$(echo "$RESP" | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    token = data.get("access_token")
+    if not token:
+        print("No access_token in response:", file=sys.stderr)
+        json.dump(data, sys.stderr, indent=2)
+        sys.exit(1)
+    print(token)
+except Exception as e:
+    print(f"Failed to parse response: {e}", file=sys.stderr)
+    print(f"Raw response: {sys.stdin.read()}", file=sys.stderr)
+    sys.exit(1)
+          ')
+          
+          # Set output with success message
           echo "access_token=$ACCESS" >> "$GITHUB_OUTPUT"
+          echo "Successfully obtained access token"
 
       - name: Run playlist updater
         env:
