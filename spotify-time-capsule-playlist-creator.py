@@ -143,6 +143,16 @@ def filter_tracks_by_play_count(csv_file):
 
 # Function to create or update the Spotify playlist
 
+# Function to update playlist description
+def update_playlist_description(sp, playlist_id, description):
+    """Update the description of an existing playlist."""
+    try:
+        sp.playlist_change_details(playlist_id, description=description)
+        print(f"📝 Updated playlist description with today's date")
+    except Exception as e:
+        print(f"⚠️  Failed to update description: {str(e)}")
+
+
 def create_or_update_playlist(sp, user_id, playlist_name, csv_file):
     # Check if the playlist exists using the existing function
     playlist_id = playlist_exists(sp, playlist_name)
@@ -172,17 +182,7 @@ def main():
         playlist_id = create_playlist(sp, playlist_name, description, public=False)
     else:
         print(f"✅ Found existing playlist: {playlist_name}")
-        # Update the description with the new date
-        print(f"DEBUG: About to update description for playlist {playlist_id}")
-        print(f"DEBUG: Description = {description}")
-        try:
-            result = sp.playlist_change_details(playlist_id, description=description)
-            print(f"DEBUG: Result = {result}")
-            print(f"📝 Updated playlist description with today's date")
-        except Exception as e:
-            print(f"⚠️  Failed to update description: {str(e)}")
-            import traceback
-            traceback.print_exc()
+        update_playlist_description(sp, playlist_id, description)
 
     # Filter and select track URIs from CSV
     track_uris = filter_tracks_by_play_count('final_filtered_tracks_with_uri.csv')
