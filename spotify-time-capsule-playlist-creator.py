@@ -4,8 +4,24 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import pandas as pd
 import random
+from datetime import datetime
 
 TOKEN_PATH = ".spotify_tokens.json"
+
+def get_ordinal_date_str():
+    """Format today's date with ordinal suffix (e.g., '19th May 2026')"""
+    today = datetime.now()
+    day = today.day
+    month = today.strftime("%B")
+    year = today.year
+    
+    # Determine ordinal suffix
+    if 10 <= day % 100 <= 20:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+    
+    return f"{day}{suffix} {month} {year}"
 
 def get_spotify_client():
     """Create a Spotipy client.
@@ -152,7 +168,7 @@ def main():
 
     # If the playlist does not exist, create it
     if not playlist_id:
-        description = "Abbie's time capsule playlist that automatically refreshes with a random selection of her old tracks every day."
+        description = f"Abbie's time capsule playlist that automatically refreshes with a random selection of her old tracks every day. Last updated {get_ordinal_date_str()}"
         playlist_id = create_playlist(sp, playlist_name, description, public=False)
     else:
         print(f"✅ Found existing playlist: {playlist_name}")
