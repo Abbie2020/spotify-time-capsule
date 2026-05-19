@@ -165,13 +165,16 @@ def main():
     # Check for existing playlist
     playlist_name = "My time capsule"
     playlist_id = playlist_exists(sp, playlist_name)
+    description = f"Abbie's time capsule playlist that automatically refreshes with a random selection of her old tracks every day. Last updated {get_ordinal_date_str()}"
 
     # If the playlist does not exist, create it
     if not playlist_id:
-        description = f"Abbie's time capsule playlist that automatically refreshes with a random selection of her old tracks every day. Last updated {get_ordinal_date_str()}"
         playlist_id = create_playlist(sp, playlist_name, description, public=False)
     else:
         print(f"✅ Found existing playlist: {playlist_name}")
+        # Update the description with the new date
+        sp.playlist_change_details(playlist_id, description=description)
+        print(f"📝 Updated playlist description with today's date")
 
     # Filter and select track URIs from CSV
     track_uris = filter_tracks_by_play_count('final_filtered_tracks_with_uri.csv')
