@@ -173,11 +173,16 @@ def main():
     else:
         print(f"✅ Found existing playlist: {playlist_name}")
         # Update the description with the new date
+        print(f"DEBUG: About to update description for playlist {playlist_id}")
+        print(f"DEBUG: Description = {description}")
         try:
-            sp.playlist_change_details(playlist_id, description=description)
+            result = sp.playlist_change_details(playlist_id, description=description)
+            print(f"DEBUG: Result = {result}")
             print(f"📝 Updated playlist description with today's date")
         except Exception as e:
-            print(f"⚠️  Failed to update description: {e}")
+            print(f"⚠️  Failed to update description: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
     # Filter and select track URIs from CSV
     track_uris = filter_tracks_by_play_count('final_filtered_tracks_with_uri.csv')
